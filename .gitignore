@@ -1,0 +1,29 @@
+# 敏感配置（禁止提交）
+config.py
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# 抓包/日志/临时文件
+*.har
+*.pcap
+*.log
+*.bin
+*.zip
+login_hook_log.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# 逆向产物
+so_dump/
+zk_src*/
+mem_*.bin
