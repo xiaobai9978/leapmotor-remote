@@ -23,6 +23,14 @@ ACCESS_TOKEN = 'YOUR_ACCESS_TOKEN'
 # 账号 ID
 USER_ID = 'YOUR_USER_ID'
 
+# ===== 凭证自动刷新参数（智控 App 抓包获取一次，refreshToken 7 天有效期内可反复用）=====
+# accountId（与 USER_ID 相同）
+ACCOUNT_ID = 'YOUR_ACCOUNT_ID'
+# accountNumber（智控 App getnewtoken 请求参数，AES-GCM(refreshToken) 密文）
+ACCOUNT_NUMBER = 'YOUR_ACCOUNT_NUMBER'
+# refreshToken（智控 App 登录响应/XFX-CDN-CROSS-REFRESH-NODE 头）
+REFRESH_TOKEN = 'YOUR_REFRESH_TOKEN'
+
 # 车控服务安全密钥（快捷指令 URL 携带）
 API_KEY = 'YOUR_API_KEY'
 

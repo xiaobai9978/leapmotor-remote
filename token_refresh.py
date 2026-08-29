@@ -2,17 +2,22 @@
 # 零跑车控凭证自动刷新模块
 # getnewtoken 接口已破解：signStr = md5Short(accountId+accountNumber+deviceID+nonce+refreshToken+timespan)
 # 凭证失效时调用 refresh_token() 自动换新 token（约 6 小时过期，可无限续）
+# 刷新凭证参数从 config.py 读取（ACCOUNT_ID / ACCOUNT_NUMBER / REFRESH_TOKEN / DEVICE_ID）
 import hashlib
 import time
 import random
 import requests
 
-# ===== 刷新凭证（从智控 App 抓取一次，refreshToken 7 天有效期内可反复用）=====
-ACCOUNT_ID = '889949398644133888'
-ACCOUNT_NUMBER = 'fYzI24fbVqSq4T_tKE1Nx6T3kT8AJkBG38ckQAQ_K6JM28HmW0ti8n6p7PebWJgKtInlYJJagG68mQGDhuJia2IM8j_oH7dZc-BxCTZ0kbjH3gkOQv1hVyaoqbtpzlnKXKvTI2an06phZbbpFBEXqvPkl8PiuCFfraa9JSl9MII'
-REFRESH_TOKEN = '6638A13F983840AF9F5688B3CCDCA5B66638A13F983840AF9F5688B3CCDCA5B6'
-DEVICE_ID = 'e7603edc4d4840f2abf35a7c4fe5a8e7'
-VERSION = '1.22.87'
+try:
+    import config
+except ImportError:
+    raise SystemExit('缺少 config.py！请复制 config.example.py 为 config.py 并填写真实凭证')
+
+ACCOUNT_ID = config.ACCOUNT_ID
+ACCOUNT_NUMBER = config.ACCOUNT_NUMBER
+REFRESH_TOKEN = config.REFRESH_TOKEN
+DEVICE_ID = config.DEVICE_ID
+VERSION = getattr(config, 'VERSION', '1.22.87')
 
 
 def md5_short(s):
@@ -37,7 +42,7 @@ def refresh_token():
         'APPImei': DEVICE_ID,
         'C-VERSIONS': 'APP',
         'XFX-CDN-VRS': 'v4',
-        'XFX-CDN-CROSS-NODE': '603D5D36608446908F8EF59333E9CECF603D5D36608446908F8EF59333E9CECF',
+        'XFX-CDN-CROSS-NODE': config.TOKEN,
         'XFX-CDN-CROSS-REFRESH-NODE': REFRESH_TOKEN,
         'User-Agent': 'okhttp/4.12.0',
         'Accept-Encoding': 'gzip',
@@ -60,4 +65,4 @@ if __name__ == '__main__':
     print('刷新:', 'OK' if ok else 'FAIL', info)
     if ok:
         print('新TOKEN=' + token)
-        print('有效期约6小时，写入 config.py 的 TOKEN 即可')
+        print('有效期约6小时，写入 config.py 的 TOKEN 即可（车控失败会自动刷新）')
