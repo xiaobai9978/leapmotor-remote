@@ -9,7 +9,13 @@
 import json
 import urllib.parse
 import sys
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    """Python 3.6 兼容的多线程服务器（3.7+ 才有内置 ThreadingHTTPServer）"""
+    daemon_threads = True
 
 sys.path.insert(0, '/www/wwwroot/car/')
 import config

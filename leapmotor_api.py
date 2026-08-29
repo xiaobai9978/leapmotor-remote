@@ -25,6 +25,47 @@ CAR_TYPE = getattr(config, 'CAR_TYPE', 'T03')
 
 _GATEWAY = 'https://appgateway.leapmotor.com'
 
+# 凭证自动刷新（getnewtoken 换新 token + oppwd 自动重算）
+import token_refresh
+
+
+def gen_oppwd(token, pwd='9978'):
+    """oppwd = base64(AES-CBC(key=md5(token_half)[8:24], iv=md5(token_half)[8:24], pwd))"""
+    import base64 as _b64
+    try:
+        from Crypto.Cipher import AES
+    except ImportError:
+        # 无 pycryptodome 时用内置回退（服务器需 pip install pycryptodome）
+        raise SystemExit('需要 pycryptodome：pip install pycryptodome')
+    kv = hashlib.md5(token[:32].encode()).hexdigest()[8:24].encode()
+    pad = 16 - (len(pwd) % 16)
+    plain = pwd.encode() + bytes([pad]) * pad
+    cipher = AES.new(kv, AES.MODE_CBC, kv)
+    return _b64.b64encode(cipher.encrypt(plain)).decode()
+
+
+def _refresh_token_inner():
+    """刷新旧协议 token + 重算 oppwd，成功返回 (True, 新token)"""
+    ok, new_token, info = token_refresh.refresh_token()
+    if ok and new_token:
+        global TOKEN, OPPWD
+        TOKEN = new_token
+        OPPWD = gen_oppwd(new_token)
+        # 同步回 config（持久化，重启不丢）
+        try:
+            cfg_path = '/www/wwwroot/car/config.py'
+            with open(cfg_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            import re
+            content = re.sub(r"TOKEN = '.*?'", "TOKEN = '" + new_token + "'", content)
+            content = re.sub(r"OPPWD = '.*?'", "OPPWD = '" + OPPWD + "'", content)
+            with open(cfg_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        except Exception:
+            pass
+        return True, new_token
+    return False, info
+
 
 def _headers():
     return {
@@ -66,6 +107,38 @@ def send_control(action):
         data = r.json()
         if data.get('code') == 0 or data.get('result') == 0:
             return True, str(data.get('data', '')), data.get('message', '请求成功')
+        msg = data.get('message', '失败 code=' + str(data.get('code')))
+        # 凭证失效自动刷新重试
+        if ('校验失败' in msg or 'TOKEN' in msg or '过期' in msg or '重新登录' in msg) and action != '_retry':
+            ok_refresh, info_refresh = _refresh_token_inner()
+            if ok_refresh:
+                return send_control(action + '_retry') if False else _send_control_retry(action)
+        return False, '', msg
+    except Exception as e:
+        return False, '', '网络异常: ' + str(e)
+
+
+def _send_control_retry(action):
+    """刷新凭证后的重试发送"""
+    cmdid = '110'
+    state = '{"value":"' + action + '"}'
+    timespan = str(int(time.time() * 1000))
+    nonce = str(random.randint(100000, 9999999))
+    signstr = _signstr(cmdid, nonce, state, timespan)
+    body = ('timespan=' + timespan +
+            '&nonce=' + nonce +
+            '&deviceID=' + DEVICE_ID +
+            '&cmdid=' + cmdid +
+            '&state=' + requests.utils.quote(state, safe='') +
+            '&carvin=' + CARVIN +
+            '&oppwd=' + requests.utils.quote(OPPWD + '\n', safe='') +
+            '&signStr=' + signstr)
+    try:
+        r = requests.post(_GATEWAY + '/app/app-control-service/v3/api/appremotectl',
+                          headers=_headers(), data=body, timeout=20)
+        data = r.json()
+        if data.get('code') == 0 or data.get('result') == 0:
+            return True, str(data.get('data', '')), data.get('message', '请求成功(已刷新凭证)')
         return False, '', data.get('message', '失败 code=' + str(data.get('code')))
     except Exception as e:
         return False, '', '网络异常: ' + str(e)
